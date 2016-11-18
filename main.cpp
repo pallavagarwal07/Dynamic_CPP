@@ -5,20 +5,27 @@ using namespace std;
 enum Types { INT = 0, FLOAT = 1, STRING = 2, LIST = 3 };
 int ALLOW_ADD[] = {1, 1, 2, 3};
 int ALLOW_MUL[] = {2, 1, 0, 0};
+struct __attribute__((__packed__)) univ;
 
-struct __attribute__((__packed__)) _int {
+struct _int {
     Types type = INT;
     long long val;
 };
 
-struct __attribute__((__packed__)) _float {
+struct _float {
     Types type = FLOAT;
     long double val;
 };
 
-struct __attribute__((__packed__)) _string {
+struct _string {
     Types type = STRING;
-    string val;
+    string &val;
+};
+
+struct _list {
+    Types type = LIST;
+    vector<univ> val;
+    _list(Types t, vector<univ> &v) : type(t), val(v){};
 };
 
 struct __attribute__((__packed__)) univ {
@@ -28,7 +35,8 @@ struct __attribute__((__packed__)) univ {
         switch (*(Types *)v.ptr) {
             case INT:
             case FLOAT:
-                ptr = (_int *)v.ptr;
+            case LIST:
+                ptr = v.ptr;
                 break;
         }
     }
@@ -49,11 +57,27 @@ struct __attribute__((__packed__)) univ {
         ((_float *)ptr)->val = val;
     }
 
+    void operator=(vector<univ> &val) { ptr = new _list(LIST, val); }
+
+    univ operator[](const int index) {
+        assert(((_list *)ptr)->type == LIST);
+        return ((_list *)ptr)->val[index];
+    }
+
     template <typename T>
     univ(T a) {
         (*this) = a;
     }
 };
+
+ostream &operator<<(ostream &os, univ a) {
+    switch (*(Types *)a.ptr) {
+        case INT:
+            return os << ((_int *)a.ptr)->val;
+        case FLOAT:
+            return os << ((_float *)a.ptr)->val;
+    }
+}
 
 univ operator+(univ a, univ b) {
     assert(*(Types *)a.ptr == *(Types *)b.ptr);
@@ -86,22 +110,31 @@ univ operator+(univ a, univ b) {
                     printf("Incompatible types for op '+' FLOAT and STRING/LIST\n");
                     exit(1);
             }
-    }
-}
-
-ostream &operator<<(ostream &os, univ a) {
-    switch (*(Types *)a.ptr) {
-        case INT:
-            return os << ((_int *)a.ptr)->val;
-        case FLOAT:
-            return os << ((_float *)a.ptr)->val;
+        case LIST:
+            switch (*(Types *)b.ptr) {
+                case LIST: {
+                    vector<univ> cpy(((_list *)a.ptr)->val);
+                    cpy.insert(cpy.end(), ((_list *)b.ptr)->val.begin(),
+                               ((_list *)b.ptr)->val.end());
+                    univ ans = cpy;
+                    return ans;
+                }
+                default:
+                    printf("Incompatible types for op '+' LIST and NUMBER/STRING\n");
+                    exit(1);
+            }
     }
 }
 
 int main() {
     cout << fixed << setprecision(6);
-    univ s = 32.03;
-    univ p = 0.0003;
+    univ s = 32;
+    univ p = 1;
+    univ a = *(new vector<univ>({1, 2.43, 340}));
+    univ a1 = *(new vector<univ>({2, 3.43, 345}));
+    univ a2 = a + a1;
+
+    cout << a2[0] << " " << a2[1] << " " << a2[5] << endl;
 
     int i = 100000000;
     while (i--) {
